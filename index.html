@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Replica - Voice Controlled</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;    
+            background-size: cover;
+            background-image: url('https://images.unsplash.com/photo-1483794344563-d27a8d18014e?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');
+            padding: 40px;
+            text-align: center;
+        }
+    
+        h1 {
+            margin-bottom: 20px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #61dafb;
+            color: #282c34;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #21a1f1;
+        }
+        .section {
+            display: none;
+            padding: 20px;
+            background-color: rgba(47, 76, 51, 0.7);
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .active {
+            display: block;
+        }
+        textarea, input[type="text"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        textarea {
+            height: 100px;
+            resize: none;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 10px;
+        }
+        li {
+            padding: 5px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin: 5px 0;
+            position: relative;
+        }
+        .remove-btn {
+            position: absolute;
+            right: 5px;
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #con{
+            font-size: 80px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AxesEaze</h1>
+    <h1 id="con">Just Say and Do</h1>
+    <p>Transcript: <span id="transcript"></span></p>
+
+    <!-- Menu Section -->
+    <div id="menuSection" class="section active">
+        <h2>Welcome to Your Voice-Controlled App</h2>
+        <p>Say "open diary," "open Tasks," or "open reminders" to navigate.</p>
+    </div>
+
+    <!-- Sections for Diary, Tasks, Reminders -->
+    <div id="diarySection" class="section">
+        <h2>Personal Diary</h2>
+        <textarea id="diaryEntry" placeholder="Write your diary entry here..."></textarea>
+        <button onclick="saveDiary()">Save Entry</button>
+        <ul id="diaryList"></ul>
+    </div>
+
+    <div id="todolistSection" class="section">
+        <h2>Tasks</h2>
+        <input type="text" id="taskInput" placeholder="Add a new task...">
+        <button onclick="addTask()">Add Task</button>
+        <ul id="taskList"></ul>
+    </div>
+
+    <div id="remindersSection" class="section">
+        <h2>Reminders</h2>
+        <input type="text" id="reminderInput" placeholder="Add a new reminder...">
+        <button onclick="addReminder()">Add Reminder</button>
+        <ul id="reminderList"></ul>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAllEntries(); // Load saved entries on page load
+            startVoiceRecognition(); // Start voice recognition automatically
+        });
+
+        // Global variables for holding the current section and entry
+        let currentSection = 'menu'; // Start with the menu
+        let currentEntry = '';
+        let currentTask = '';
+
+        // Handle voice commands
+        let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onresult = (event) => {
+            let transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+            document.getElementById('transcript').textContent = transcript;
+
+            // Handle navigation commands
+            if (transcript.includes('open diary')) {
+                switchSection('diary');
+                speak('Opening diary');
+            } else if (transcript.includes('open to list')) {
+                switchSection('todolist');
+                speak('Opening tasks');
+            } else if (transcript.includes('open reminders')) {
+                switchSection('reminders');
+                speak('Opening reminders');
+            } else if (transcript.includes('go to menu')) {
+                switchSection('menu');
+                speak('Returning to menu');
+            } else if (transcript.includes('go to home')) {
+                switchSection('menu');
+                speak('Going to home.');
+            } else if (transcript.includes('clear')) {
+                clearAllEntries();
+                speak('All entries cleared.');
+            } else if (transcript.includes('submit')) {
+                saveCurrentEntry();
+            } 
+            // Voice command for saving entries, tasks, and reminders
+            else if (transcript.includes('save entry')) {
+                if (currentSection === 'diary') {
+                    saveDiaryEntry(currentEntry);
+                    speak('Diary entry saved.');
+                }
+            } else if (transcript.includes('save task')) {
+                if (currentSection === 'todolist') {
+                    saveToDoEntry(currentEntry);
+                    speak('Task saved.');
+                }
+            } else if (transcript.includes('save reminder')) {
+                if (currentSection === 'reminders') {
+                    saveReminderEntry(currentEntry);
+                    speak('Reminder saved.');
+                }
+            } 
+            // Remove entries through voice commands
+            else if (transcript.includes('remove diary entry')) {
+                removeLastDiaryEntry();
+                speak('Last diary entry removed.');
+            } else if (transcript.includes('remove task')) {
+                let taskToRemove = transcript.replace('remove task', '').trim();
+                removeTask(taskToRemove);
+                speak('Task removed: ' + taskToRemove);
+            } else if (transcript.includes('remove reminder')) {
+                let reminderToRemove = transcript.replace('remove reminder', '').trim();
+                removeReminder(reminderToRemove);
+                speak('Reminder removed: ' + reminderToRemove);
+            } else {
+                currentEntry = transcript;
+                displayCurrentEntry();
+                speak('Entry recorded. Say submit to save it.');
+            }
+        };
+
+        // Start voice recognition automatically when the page loads
+        function startVoiceRecognition() {
+            recognition.start();
+        }
+
+        // Switch between sections
+        function switchSection(section) {
+            document.getElementById('menuSection').classList.remove('active');
+            document.getElementById('diarySection').classList.remove('active');
+            document.getElementById('todolistSection').classList.remove('active');
+            document.getElementById('remindersSection').classList.remove('active');
+
+            if (section === 'menu') {
+                document.getElementById('menuSection').classList.add('active');
+                currentSection = 'menu';
+            } else if (section === 'diary') {
+                document.getElementById('diarySection').classList.add('active');
+                currentSection = 'diary';
+                document.getElementById('diaryEntry').value = currentEntry;
+            } else if (section === 'todolist') {
+                document.getElementById('todolistSection').classList.add('active');
+                currentSection = 'todolist';
+                document.getElementById('taskInput').value = currentEntry;
+            } else if (section === 'reminders') {
+                document.getElementById('remindersSection').classList.add('active');
+                currentSection = 'reminders';
+                document.getElementById('reminderInput').value = currentEntry;
+            }
+        }
+
+        // Display the current entry in the relevant section
+        function displayCurrentEntry() {
+            if (currentSection === 'diary') {
+                document.getElementById('diaryEntry').value = currentEntry;
+            } else if (currentSection === 'todolist') {
+                document.getElementById('taskInput').value = currentEntry;
+            } else if (currentSection === 'reminders') {
+                document.getElementById('reminderInput').value = currentEntry;
+            }
+        }
+
+        // Save current entry based on the active section
+        function saveCurrentEntry() {
+            if (!currentEntry) {
+                speak('No entry to save.');
+                return;
+            }
+
+            if (currentSection === 'diary') {
+                saveDiaryEntry(currentEntry);
+            } else if (currentSection === 'todolist') {
+                saveToDoEntry(currentEntry);
+            } else if (currentSection === 'reminders') {
+                saveReminderEntry(currentEntry);
+            }
+        }
+
+        // Save diary entry
+        function saveDiaryEntry(entry) {
+            let diaryList = document.getElementById('diaryList');
+            let newEntry = document.createElement('li');
+            newEntry.textContent = entry;
+            diaryList.appendChild(newEntry);
+
+            // Store in local storage
+            let diaryEntries = JSON.parse(localStorage.getItem('diaryEntries')) || [];
+            diaryEntries.push(entry);
+            localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
+
+            currentEntry = '';  // Clear the current entry
+            document.getElementById('diaryEntry').value = '';
+        }
+
+        // Save to-do task
+        function saveToDoEntry(entry) {
+            let taskList = document.getElementById('taskList');
+            let newTask = document.createElement('li');
+            newTask.textContent = entry;
+            taskList.appendChild(newTask);
+
+            // Store in local storage
+            let todoEntries = JSON.parse(localStorage.getItem('todoEntries')) || [];
+            todoEntries.push(entry);
+            localStorage.setItem('todoEntries', JSON.stringify(todoEntries));
+
+            currentEntry = '';  // Clear the current entry
+            document.getElementById('taskInput').value = '';
+        }
+
+        // Save reminder
+        function saveReminderEntry(entry) {
+            let reminderList = document.getElementById('reminderList');
+            let newReminder = document.createElement('li');
+            newReminder.textContent = entry;
+            reminderList.appendChild(newReminder);
+
+            // Store in local storage
+            let reminderEntries = JSON.parse(localStorage.getItem('reminderEntries')) || [];
+            reminderEntries.push(entry);
+            localStorage.setItem('reminderEntries', JSON.stringify(reminderEntries));
+
+            currentEntry = '';  // Clear the current entry
+            document.getElementById('reminderInput').value = '';
+        }
+
+        // Load all entries from local storage on page load
+        function loadAllEntries() {
+            let diaryEntries = JSON.parse(localStorage.getItem('diaryEntries')) || [];
+            diaryEntries.forEach(entry => {
+                let diaryList = document.getElementById('diaryList');
+                let newEntry = document.createElement('li');
+                newEntry.textContent = entry;
+                diaryList.appendChild(newEntry);
+            });
+
+            let todoEntries = JSON.parse(localStorage.getItem('todoEntries')) || [];
+            todoEntries.forEach(entry => {
+                let taskList = document.getElementById('taskList');
+                let newTask = document.createElement('li');
+                newTask.textContent = entry;
+                taskList.appendChild(newTask);
+            });
+
+            let reminderEntries = JSON.parse(localStorage.getItem('reminderEntries')) || [];
+            reminderEntries.forEach(entry => {
+                let reminderList = document.getElementById('reminderList');
+                let newReminder = document.createElement('li');
+                newReminder.textContent = entry;
+                reminderList.appendChild(newReminder);
+            });
+        }
+
+        // Remove last diary entry
+        function removeLastDiaryEntry() {
+            let diaryList = document.getElementById('diaryList');
+            if (diaryList.lastChild) {
+                diaryList.removeChild(diaryList.lastChild); // Remove last entry from the list
+            }
+            
+            // Remove last entry from local storage
+            let diaryEntries = JSON.parse(localStorage.getItem('diaryEntries')) || [];
+            diaryEntries.pop(); // Remove the last entry from the array
+            localStorage.setItem('diaryEntries', JSON.stringify(diaryEntries));
+        }
+
+        // Remove specific task
+        function removeTask(task) {
+            let taskList = document.getElementById('taskList');
+            let tasks = taskList.getElementsByTagName('li');
+            for (let i = 0; i < tasks.length; i++) {
+                if (tasks[i].textContent.includes(task)) {
+                    taskList.removeChild(tasks[i]);
+                    break;
+                }
+            }
+
+            // Remove from local storage
+            let todoEntries = JSON.parse(localStorage.getItem('todoEntries')) || [];
+            todoEntries = todoEntries.filter(entry => entry !== task); // Remove the task
+            localStorage.setItem('todoEntries', JSON.stringify(todoEntries));
+        }
+
+        // Remove specific reminder
+        function removeReminder(reminder) {
+            let reminderList = document.getElementById('reminderList');
+            let reminders = reminderList.getElementsByTagName('li');
+            for (let i = 0; i < reminders.length; i++) {
+                if (reminders[i].textContent.includes(reminder)) {
+                    reminderList.removeChild(reminders[i]);
+                    break;
+                }
+            }
+
+            // Remove from local storage
+            let reminderEntries = JSON.parse(localStorage.getItem('reminderEntries')) || [];
+            reminderEntries = reminderEntries.filter(entry => entry !== reminder); // Remove the reminder
+            localStorage.setItem('reminderEntries', JSON.stringify(reminderEntries));
+        }
+
+        // Clear all entries
+        function clearAllEntries() {
+            localStorage.clear();
+            document.getElementById('diaryList').innerHTML = '';
+            document.getElementById('taskList').innerHTML = '';
+            document.getElementById('reminderList').innerHTML = '';
+        }
+
+        // Text-to-speech function
+        function speak(text) {
+            let utterance = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
